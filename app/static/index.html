@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light" />
+    <meta name="theme-color" content="#f6f8fb" />
+    <title>智能 CRM</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='9' fill='%232563eb'/%3E%3Cpath d='M9 10h14M9 16h10M9 22h7' stroke='white' stroke-width='2.5' stroke-linecap='round'/%3E%3C/svg%3E" />
+    <link rel="stylesheet" href="/static/style.css" />
+  </head>
+  <body>
+    <section id="auth-gate" class="auth-gate" aria-label="账号登录">
+      <div class="auth-card">
+        <div class="auth-brand"><span class="brand-mark">智</span><span>智能 CRM</span></div>
+        <div id="auth-loading" class="auth-loading" role="status">
+          <span class="auth-spinner" aria-hidden="true"></span><strong>正在恢复安全会话</strong><p>请稍候，我们正在确认你的登录状态。</p>
+        </div>
+        <div id="auth-content" class="auth-content" hidden>
+          <div class="auth-heading"><p class="overline">INTELLIGENT CRM</p><h1 id="auth-title">欢迎回来</h1><p id="auth-description">登录智能 CRM，管理客户、销售跟进并使用 AI 助手。</p></div>
+          <div class="auth-tabs" role="tablist" aria-label="账号操作">
+            <button id="show-login" class="auth-tab active" type="button" role="tab" aria-selected="true">登录</button>
+            <button id="show-register" class="auth-tab" type="button" role="tab" aria-selected="false">注册</button>
+          </div>
+          <p id="auth-error" class="auth-error" role="alert" hidden></p>
+          <form id="login-form" class="auth-form" autocomplete="on">
+            <label><span>用户名或邮箱</span><input id="login-username" name="username" autocomplete="username" maxlength="254" required /></label>
+            <label><span>密码</span><input id="login-password" name="password" type="password" autocomplete="current-password" maxlength="256" required /></label>
+            <button class="auth-submit" type="submit">登录 CRM</button>
+          </form>
+          <form id="register-form" class="auth-form" autocomplete="on" hidden>
+            <p class="bootstrap-notice"><strong>首次安全初始化</strong>首个管理员请在运行服务的电脑上通过 <code>localhost</code> 或 <code>127.0.0.1</code>（端口以部署配置为准）注册；后续账号默认为销售角色。</p>
+            <label><span>显示名称</span><input id="register-display-name" name="display_name" autocomplete="name" maxlength="100" required /></label>
+            <label><span>用户名</span><input id="register-username" name="username" autocomplete="username" minlength="3" maxlength="50" pattern="[A-Za-z0-9_.-]+" required /></label>
+            <label><span>公司邮箱</span><input id="register-email" name="email" type="email" autocomplete="email" maxlength="320" required /></label>
+            <label><span>密码</span><input id="register-password" name="password" type="password" autocomplete="new-password" minlength="10" maxlength="256" required /></label>
+            <p class="password-hint">至少 10 位；建议混合字母、数字和符号。</p>
+            <button class="auth-submit" type="submit">创建账号并进入</button>
+          </form>
+        </div>
+      </div>
+      <p class="auth-footnote">登录凭据通过 HttpOnly 安全 Cookie 保存。</p>
+    </section>
+
+    <div id="app-shell" class="app-shell" hidden>
+      <aside id="main-sidebar" class="main-sidebar" aria-label="主导航">
+        <div class="sidebar-brand"><span class="brand-mark">智</span><div><strong>智能 CRM</strong><span>智能客户关系管理</span></div><button id="close-main-sidebar" class="icon-button mobile-only" type="button" aria-label="关闭导航">×</button></div>
+        <nav class="main-nav">
+          <button class="nav-item active" data-page="dashboard" type="button"><span class="nav-icon">⌂</span>工作台</button>
+          <span class="nav-group-label">销售管理</span>
+          <button class="nav-item" data-page="leads" type="button"><span class="nav-icon">◇</span>线索</button>
+          <button class="nav-item" data-page="accounts" type="button"><span class="nav-icon">▦</span>客户公司</button>
+          <button class="nav-item" data-page="contacts" type="button"><span class="nav-icon">♙</span>联系人</button>
+          <button class="nav-item" data-page="opportunities" type="button"><span class="nav-icon">◒</span>商机</button>
+          <button class="nav-item" data-page="activities" type="button"><span class="nav-icon">✓</span>跟进活动</button>
+          <span class="nav-group-label">智能与系统</span>
+          <button class="nav-item" data-page="assistant" type="button"><span class="nav-icon">✦</span>AI 助手<span id="nav-pending-count" class="nav-badge warning" hidden>0</span></button>
+          <button id="users-nav" class="nav-item" data-page="users" type="button"><span class="nav-icon">⚙</span>账号管理</button>
+        </nav>
+        <div class="sidebar-spacer"></div>
+        <div class="system-state"><span class="status-dot"></span><div><strong>系统运行正常</strong><span>业务数据库与智能助手已连接</span></div></div>
+        <div class="profile-row"><span id="account-avatar" class="avatar">U</span><div class="profile-copy"><strong id="account-display-name">当前账号</strong><span><span id="account-username">—</span> · <span id="account-role">—</span></span></div><button id="logout" class="icon-button" type="button" aria-label="退出登录" title="退出登录">↪</button></div>
+      </aside>
+
+      <main class="main-content">
+        <header class="topbar">
+          <button id="open-main-sidebar" class="icon-button mobile-only" type="button" aria-label="打开导航">☰</button>
+          <div><p class="breadcrumb">智能 CRM / <span id="page-breadcrumb">工作台</span></p><h1 id="page-title">工作台</h1></div>
+          <div class="topbar-actions"><button id="global-refresh" class="button-secondary" type="button">刷新数据</button><button id="global-add-customer" class="button-primary" type="button">＋ 新增线索</button></div>
+        </header>
+
+        <div class="page-scroll">
+          <section id="page-dashboard" class="page active" aria-label="工作台">
+            <div class="welcome-banner"><div><p class="overline">OVERVIEW</p><h2 id="welcome-title">你好，欢迎回来</h2><p>这里是你当前权限范围内的 CRM 业务概览。</p></div><button class="button-light" data-go-page="assistant" type="button">询问 AI 助手 →</button></div>
+            <div class="metric-grid">
+              <article class="metric-card"><span class="metric-icon blue">▦</span><div><span>业务记录</span><strong id="metric-total">—</strong><small>五个核心业务表</small></div></article>
+              <article class="metric-card"><span class="metric-icon violet">◇</span><div><span>线索</span><strong id="metric-contacted">—</strong><small>当前可见线索</small></div></article>
+              <article class="metric-card"><span class="metric-icon green">◒</span><div><span>商机</span><strong id="metric-converted">—</strong><small>当前可见商机</small></div></article>
+              <article class="metric-card"><span class="metric-icon amber">✦</span><div><span>AI 待确认</span><strong id="metric-pending">—</strong><small>等待人工审核</small></div></article>
+            </div>
+            <div class="dashboard-grid">
+              <article class="content-card"><div class="card-heading"><div><h2>业务模块分布</h2><p>当前权限范围内的五表数据</p></div><button class="link-button" data-go-page="leads" type="button">查看线索</button></div><div id="status-overview" class="status-overview"></div></article>
+              <article class="content-card"><div class="card-heading"><div><h2>最近业务记录</h2><p>最近更新的线索、公司、联系人、商机和活动</p></div></div><div id="recent-customers" class="recent-list"></div></article>
+            </div>
+          </section>
+
+          <section id="page-records" class="page resource-page" aria-label="业务数据模块">
+            <div class="section-toolbar"><div><p id="resource-overline" class="overline">SALES DATA</p><h2 id="resource-title">业务数据</h2><p id="resource-description">读取并维护数据库中的业务记录。</p></div><button id="add-resource" class="button-primary" type="button">＋ 新增</button></div>
+            <div class="filter-bar"><label class="search-control"><span>⌕</span><input id="resource-search" type="search" placeholder="搜索当前模块" /></label><button id="resource-filter-context" class="filter-context" type="button" hidden></button><span id="resource-result-count" class="result-count">0 条记录</span></div>
+            <div class="table-card"><div class="table-wrap"><table><thead><tr id="resource-table-head"></tr></thead><tbody id="resource-table-body"></tbody></table></div><div id="resource-table-empty" class="table-empty">选择左侧模块以读取数据。</div></div>
+            <nav id="resource-pagination" class="resource-pagination" aria-label="业务记录分页"><button id="resource-prev-page" class="button-secondary" type="button">上一页</button><span id="resource-page-state">第 1 页</span><button id="resource-next-page" class="button-secondary" type="button">下一页</button></nav>
+          </section>
+
+          <section id="page-assistant" class="page page-assistant" aria-label="AI 助手">
+            <div class="assistant-shell">
+              <aside id="thread-sidebar" class="thread-sidebar">
+                <div class="thread-rail-heading"><div><strong>AI 会话</strong><span>独立多轮记忆</span></div><button id="close-sidebar" class="icon-button assistant-mobile-only" type="button">×</button></div>
+                <button id="new-thread" class="new-thread-button" type="button">＋ 新建会话 <kbd>⌘ K</kbd></button>
+                <div class="thread-section-heading"><span>最近会话</span><span id="thread-count">0</span></div><nav id="thread-list" class="thread-list"></nav>
+              </aside>
+              <section class="chat-workspace">
+                <header class="workspace-header"><button id="open-sidebar" class="icon-button assistant-mobile-only" type="button">☰</button><div class="conversation-heading"><div class="title-line"><h2 id="current-title">新会话</h2><button id="rename-thread" class="title-edit" type="button" aria-label="重命名">✎</button></div><p><span class="status-dot"></span> 智能 CRM 助手在线</p></div><button id="toggle-inspector" class="context-button" type="button">待确认 <span id="assistant-pending-badge">0</span></button></header>
+                <button id="pending-review-banner" class="pending-review-banner" type="button" hidden><span>待人工确认</span><strong><span id="pending-review-count">0</span> 项 CRM 数据变更</strong><small>查看详情并决定是否写入数据库 →</small></button>
+                <section id="messages" class="messages" aria-live="polite"></section>
+                <footer class="composer-area"><div class="composer-wrap"><form id="chat-form" class="composer"><textarea id="message" rows="1" maxlength="20000" placeholder="让 AI 查询、录入或更新线索、公司、联系人、商机和活动…" required></textarea><button id="send-button" class="send-button" type="submit">➤</button></form><div class="composer-meta"><span>Enter 发送 · Shift + Enter 换行</span><span>变更写入前需要确认</span></div></div></footer>
+              </section>
+              <aside id="customer-inspector" class="customer-inspector"><header class="inspector-header"><div><p class="overline">CRM REVIEW</p><h2>CRM 变更确认</h2></div><button id="close-inspector" class="icon-button inspector-close" type="button">×</button></header><div class="inspector-body"><p id="inspector-hint" class="inspector-hint">智能助手提交的新增或更新会先停在这里，只有你确认后才写入数据库。</p><div class="section-row"><h3>待确认变更</h3><span><strong id="pending-count">0</strong> 项</span></div><div id="pending-actions" class="pending-actions"></div><div class="section-row"><h3>业务数据概览</h3><button id="refresh" class="link-button" type="button">刷新</button></div><div class="data-summary"><div><strong id="customer-count">0</strong><span>可见业务记录</span></div><div><strong>授权</strong><span>角色范围</span></div></div><div id="business-counts" class="business-counts"></div><div id="customers" class="customers legacy-context" hidden></div></div></aside>
+            </div>
+          </section>
+
+          <section id="page-users" class="page" aria-label="账号管理">
+            <div class="section-toolbar"><div><h2>账号与权限</h2><p id="users-page-description">查看当前账号；管理员可以管理公司成员角色。</p></div></div>
+            <div class="permission-note"><strong>角色权限</strong><span>管理员：全部业务数据与账号管理　·　经理：全部业务数据 CRUD　·　销售：仅本人业务数据，可新增和编辑　·　只读：只能查看</span></div>
+            <div class="table-card"><div class="table-wrap"><table><thead><tr><th>成员</th><th>账号</th><th>角色</th><th>状态</th><th>最近登录</th></tr></thead><tbody id="user-table-body"></tbody></table></div><div id="user-table-empty" class="table-empty" hidden></div></div>
+          </section>
+        </div>
+      </main>
+    </div>
+
+    <div id="page-scrim" class="page-scrim" hidden></div>
+    <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+
+    <div id="legacy-customer-runtime" hidden aria-hidden="true"><button id="add-customer" type="button"></button><input id="customer-search" /><select id="customer-status-filter"><option value=""></option></select><span id="customer-result-count"></span><table><tbody id="customer-table-body"></tbody></table><div id="customer-table-empty"></div></div>
+
+    <dialog id="customer-dialog" class="modal customer-dialog">
+      <form id="customer-form">
+        <div class="dialog-heading"><div><p class="overline">CUSTOMER</p><h2 id="customer-dialog-title">新增客户</h2></div><button id="close-customer-dialog" class="icon-button" type="button">×</button></div>
+        <input id="customer-id" type="hidden" />
+        <div class="form-grid"><label class="span-2"><span>客户姓名 *</span><input id="customer-name" maxlength="200" required /></label><label><span>公司</span><input id="customer-company" maxlength="200" /></label><label><span>职位</span><input id="customer-title" maxlength="120" /></label><label><span>邮箱</span><input id="customer-email" type="email" maxlength="320" /></label><label><span>电话</span><input id="customer-phone" maxlength="60" /></label><label><span>客户状态</span><select id="customer-status"><option value="new">新线索</option><option value="contacted">已联系</option><option value="qualified">已确认</option><option value="converted">已转化</option><option value="lost">已流失</option></select></label><label><span>来源</span><input id="customer-source" maxlength="120" /></label><label class="span-2"><span>备注</span><textarea id="customer-notes" rows="4" maxlength="10000"></textarea></label></div>
+        <p class="form-help">邮箱和电话至少填写一个。</p><p id="customer-form-error" class="form-error" hidden></p>
+        <div class="dialog-actions"><button id="cancel-customer" class="button-secondary" type="button">取消</button><button id="save-customer" class="button-primary" type="submit">保存客户</button></div>
+      </form>
+    </dialog>
+
+    <dialog id="customer-detail-dialog" class="modal detail-dialog"><div class="dialog-heading"><div><p class="overline">CUSTOMER PROFILE</p><h2 id="detail-customer-name">客户详情</h2></div><button id="close-customer-detail" class="icon-button" type="button">×</button></div><div id="customer-detail-content" class="detail-content"></div><div id="customer-detail-actions" class="dialog-actions"></div></dialog>
+
+    <dialog id="resource-dialog" class="modal resource-dialog">
+      <form id="resource-form">
+        <div class="dialog-heading"><div><p id="resource-dialog-overline" class="overline">SALES DATA</p><h2 id="resource-dialog-title">新增记录</h2></div><button id="close-resource-dialog" class="icon-button" type="button" aria-label="关闭">×</button></div>
+        <input id="resource-id" type="hidden" />
+        <div id="resource-form-fields" class="form-grid"></div>
+        <p id="resource-form-error" class="form-error" hidden></p>
+        <div class="dialog-actions"><button id="cancel-resource" class="button-secondary" type="button">取消</button><button id="save-resource" class="button-primary" type="submit">保存</button></div>
+      </form>
+    </dialog>
+
+    <dialog id="resource-detail-dialog" class="modal detail-dialog"><div class="dialog-heading"><div><p id="resource-detail-overline" class="overline">SALES DATA</p><h2 id="resource-detail-title">记录详情</h2></div><button id="close-resource-detail" class="icon-button" type="button" aria-label="关闭">×</button></div><div id="resource-detail-content" class="detail-content"></div><div id="resource-detail-actions" class="dialog-actions"></div></dialog>
+
+    <dialog id="lead-convert-dialog" class="modal lead-convert-dialog">
+      <form id="lead-convert-form">
+        <div class="dialog-heading"><div><p class="overline">LEAD CONVERSION</p><h2>将线索转为客户</h2><p id="lead-convert-subtitle" class="dialog-subtitle">一次提交创建并关联完整客户资料。</p></div><button id="close-lead-convert" class="icon-button" type="button" aria-label="关闭">×</button></div>
+        <input id="convert-lead-id" type="hidden" />
+        <div class="conversion-lead-summary"><span class="customer-avatar" id="convert-lead-avatar">线</span><div><strong id="convert-lead-name">当前线索</strong><span id="convert-lead-company">—</span></div></div>
+
+        <fieldset class="conversion-section">
+          <legend><span>1</span>客户公司</legend>
+          <label><span>处理方式</span><select id="convert-account-mode"><option value="existing">关联现有公司</option><option value="new">创建新公司</option></select></label>
+          <div id="convert-existing-account" class="conversion-fields"><label class="span-2"><span>选择公司 *</span><input id="convert-account-search" type="search" placeholder="输入公司名称搜索全部可见公司" /><select id="convert-account-id"></select></label></div>
+          <div id="convert-new-account" class="conversion-fields form-grid" hidden><label class="span-2"><span>公司名称 *</span><input id="convert-account-name" maxlength="255" /></label><label><span>行业</span><input id="convert-account-industry" maxlength="100" /></label><label><span>电话</span><input id="convert-account-phone" maxlength="50" /></label><label><span>邮箱</span><input id="convert-account-email" type="email" maxlength="255" /></label><label><span>来源</span><input id="convert-account-source" maxlength="100" /></label></div>
+        </fieldset>
+
+        <fieldset class="conversion-section">
+          <legend><span>2</span>联系人</legend>
+          <label><span>处理方式</span><select id="convert-contact-mode"><option value="new">创建新联系人</option><option value="existing">关联现有联系人</option><option value="auto">按线索信息自动创建</option></select></label>
+          <div id="convert-existing-contact" class="conversion-fields" hidden><label class="span-2"><span>选择联系人 *</span><input id="convert-contact-search" type="search" placeholder="输入姓名、邮箱或电话搜索该公司联系人" /><select id="convert-contact-id"></select></label></div>
+          <div id="convert-new-contact" class="conversion-fields form-grid"><label><span>名</span><input id="convert-contact-first-name" maxlength="100" /></label><label><span>姓</span><input id="convert-contact-last-name" maxlength="100" /></label><label><span>职位</span><input id="convert-contact-title" maxlength="150" /></label><label><span>邮箱</span><input id="convert-contact-email" type="email" maxlength="255" /></label><label><span>手机</span><input id="convert-contact-mobile" maxlength="50" /></label><label><span>来源</span><input id="convert-contact-source" maxlength="100" /></label></div>
+        </fieldset>
+
+        <fieldset class="conversion-section">
+          <legend><span>3</span>商机（可选）</legend>
+          <label class="conversion-toggle"><input id="convert-create-opportunity" type="checkbox" /><span>同时创建首个商机</span></label>
+          <div id="convert-opportunity-fields" class="conversion-fields form-grid" hidden><label class="span-2"><span>商机名称 *</span><input id="convert-opportunity-name" maxlength="255" /></label><label><span>金额</span><input id="convert-opportunity-amount" type="number" step="0.01" /></label><label><span>币种</span><input id="convert-opportunity-currency" maxlength="10" value="CNY" /></label><label><span>阶段</span><input id="convert-opportunity-stage" list="convert-stage-options" maxlength="50" value="prospecting" /><datalist id="convert-stage-options"><option value="prospecting"></option><option value="qualification"></option><option value="proposal"></option><option value="negotiation"></option></datalist></label><label><span>赢单概率</span><input id="convert-opportunity-probability" type="number" step="0.01" /></label><label><span>预计成交日期</span><input id="convert-opportunity-close-date" type="date" /></label><label><span>来源</span><input id="convert-opportunity-source" maxlength="100" /></label><label class="span-2"><span>商机说明</span><textarea id="convert-opportunity-description" rows="3"></textarea></label></div>
+        </fieldset>
+
+        <div id="conversion-confirmation" class="conversion-confirmation"></div>
+        <label class="confirmation-check"><input id="convert-confirm" type="checkbox" required /><span>我已核对以上公司、联系人和商机信息，确认执行原子转换。</span></label>
+        <p id="lead-convert-error" class="form-error" hidden></p>
+        <div class="dialog-actions"><button id="cancel-lead-convert" class="button-secondary" type="button">取消</button><button id="submit-lead-convert" class="button-primary" type="submit">确认转换</button></div>
+      </form>
+    </dialog>
+
+    <dialog id="account-transfer-dialog" class="modal rename-dialog">
+      <form id="account-transfer-form">
+        <div class="dialog-heading"><div><p class="overline">OWNER TRANSFER</p><h2>转移整条客户关系</h2><p class="dialog-subtitle">仅管理员可执行。公司、联系人、商机、来源线索与关联活动将原子转给新负责人。</p></div><button id="close-account-transfer" class="icon-button" type="button" aria-label="关闭">×</button></div>
+        <input id="transfer-account-id" type="hidden" />
+        <label><span>新负责人 *</span><select id="transfer-owner-id" required></select></label>
+        <div id="transfer-impact" class="transfer-impact"></div>
+        <label class="confirmation-check"><input id="transfer-confirm" type="checkbox" required /><span>我已核对目标账号，确认转移全部关联业务数据。此操作会影响该公司完整关系链。</span></label>
+        <p id="account-transfer-error" class="form-error" hidden></p>
+        <div class="dialog-actions"><button id="cancel-account-transfer" class="button-secondary" type="button">取消</button><button id="submit-account-transfer" class="button-primary" type="submit">确认转移</button></div>
+      </form>
+    </dialog>
+
+    <dialog id="rename-dialog" class="modal rename-dialog"><form id="rename-form"><div class="dialog-heading"><h2>重命名会话</h2><button id="cancel-rename-x" class="icon-button" type="button">×</button></div><label>会话名称<input id="rename-input" maxlength="120" required /></label><div class="dialog-actions"><button id="cancel-rename" class="button-secondary" type="button">取消</button><button class="button-primary" type="submit">保存</button></div></form></dialog>
+    <script src="/static/app.js"></script>
+  </body>
+</html>
