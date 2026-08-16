@@ -170,4 +170,4 @@ agent_assets/skills/
 
 ## 许可
 
-本仓库为私有专有软件，不授予开源许可。详见 [`LICENSE`](LICENSE)。
+本仓库基于 MIT License 开源。您可以自由地使用、复制、修改、合并、发布、分发、再许可和销售本软件，但须遵守 MIT License 中规定的相关条件。详见 [`LICENSE`](LICENSE)。
