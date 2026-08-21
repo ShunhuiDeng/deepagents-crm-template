@@ -5,7 +5,7 @@ from __future__ import annotations
 import hashlib
 import re
 from collections.abc import Sequence
-from typing import Any, Protocol
+from typing import Protocol
 from uuid import UUID
 
 from langchain_openai import OpenAIEmbeddings
