@@ -13,6 +13,7 @@ def test_skill_loader_seeds_all_agent_skill_roots() -> None:
     files = load_skill_files()
     assert "/skills/supervisor/crm-orchestration/SKILL.md" in files
     assert "/skills/crud-agent/customer-crud/SKILL.md" in files
+    assert "/skills/knowledge-agent/knowledge-retrieval/SKILL.md" in files
     assert "/skills/opportunity-analyst/opportunity-analysis/SKILL.md" in files
     assert all(path.startswith("/skills/") for path in files)
 

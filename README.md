@@ -14,6 +14,7 @@
 - 主 Agent 与一个 CRM 数据子 Agent。
 - 按账号和会话隔离的多轮记忆与 PostgreSQL checkpoint。
 - Agent 查询即时执行；新增、更新和线索转换需人工确认。
+- 可选 pgvector 知识库 RAG：管理员导入文档，知识库 Agent 只返回当前账号可访问的来源内容。
 - 写入前复检权限、负责人、外键和版本，并记录审计日志。
 
 ## 权限矩阵
@@ -157,6 +158,30 @@ agent_assets/skills/
 新增工具或 Skill 时，应使用强类型窄工具，从服务端运行上下文取得身份，在 Repository 层重复执行 RBAC，并让所有业务写入经过 pending、确认、事务和审计流程。
 
 详见 [`docs/agent-architecture.md`](docs/agent-architecture.md) 和 [`docs/memory-architecture.md`](docs/memory-architecture.md)。
+
+## 知识库 RAG
+
+知识库与 CRM 业务表分离：`crud-agent` 查询结构化客户事实，`knowledge-agent` 查询产品资料、制度和销售文档。二者由主 Agent 调度，知识库结果必须包含来源，不能被当作可执行指令。
+
+首次启用前，请在 PostgreSQL 服务器安装 `pgvector` 扩展；应用启动时会通过迁移执行 `CREATE EXTENSION vector` 并创建 `knowledge_documents`、`knowledge_chunks`。执行该迁移的数据库角色必须拥有创建扩展和表/索引的权限。
+
+设置 `.env.local`：
+
+```dotenv
+ENABLED_SUBAGENTS=crud-agent,knowledge-agent
+KNOWLEDGE_EMBEDDING_MODEL=text-embedding-3-small
+KNOWLEDGE_CHUNK_SIZE=1800
+KNOWLEDGE_CHUNK_OVERLAP=240
+```
+
+管理员可以使用受认证保护的 `POST /api/knowledge/documents` 写入文本知识，也可以导入文件：
+
+```bash
+uv run python scripts/ingest-knowledge.py ./docs/product.md \
+  --owner-username <admin-username>
+```
+
+首期脚本支持 UTF-8 编码的 `.txt` 和 `.md`。`--private` 只允许导入账号检索；默认 `shared` 文档可被所有已登录账号检索。知识库管理 API 仅允许管理员使用。
 
 ## 生产化要求
 

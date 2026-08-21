@@ -366,6 +366,52 @@ MIGRATIONS = (
             """,
         ),
     ),
+    Migration(
+        migration_id="crm_app_004_knowledge_rag",
+        statements=(
+            "CREATE EXTENSION IF NOT EXISTS vector",
+            """
+            CREATE TABLE IF NOT EXISTS knowledge_documents (
+                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                created_by_user_id UUID NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+                title TEXT NOT NULL,
+                source TEXT,
+                visibility TEXT NOT NULL DEFAULT 'shared'
+                    CHECK (visibility IN ('private', 'shared')),
+                content_sha256 CHAR(64) NOT NULL,
+                chunk_count INTEGER NOT NULL DEFAULT 0 CHECK (chunk_count >= 0),
+                metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                UNIQUE (created_by_user_id, content_sha256)
+            )
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS knowledge_chunks (
+                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                document_id UUID NOT NULL REFERENCES knowledge_documents(id) ON DELETE CASCADE,
+                chunk_index INTEGER NOT NULL CHECK (chunk_index >= 0),
+                content TEXT NOT NULL,
+                embedding vector(1536) NOT NULL,
+                metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                UNIQUE (document_id, chunk_index)
+            )
+            """,
+            """
+            CREATE INDEX IF NOT EXISTS knowledge_documents_visibility_idx
+            ON knowledge_documents(visibility, created_by_user_id, updated_at DESC)
+            """,
+            """
+            CREATE INDEX IF NOT EXISTS knowledge_chunks_document_idx
+            ON knowledge_chunks(document_id, chunk_index)
+            """,
+            """
+            CREATE INDEX IF NOT EXISTS knowledge_chunks_embedding_hnsw_idx
+            ON knowledge_chunks USING hnsw (embedding vector_cosine_ops)
+            """,
+        ),
+    ),
 )
 
 

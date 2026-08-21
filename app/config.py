@@ -80,6 +80,16 @@ class Settings(BaseSettings):
     agent_timeout_seconds: float = Field(
         default=120.0, validation_alias="AGENT_TIMEOUT_SECONDS"
     )
+    knowledge_embedding_model: str = Field(
+        default="text-embedding-3-small",
+        validation_alias="KNOWLEDGE_EMBEDDING_MODEL",
+    )
+    knowledge_chunk_size: int = Field(
+        default=1800, ge=400, le=8000, validation_alias="KNOWLEDGE_CHUNK_SIZE"
+    )
+    knowledge_chunk_overlap: int = Field(
+        default=240, ge=0, le=2000, validation_alias="KNOWLEDGE_CHUNK_OVERLAP"
+    )
 
     def model_api_key(self) -> str | None:
         """Return the configured provider key and fail clearly for an OpenAI model."""
@@ -91,6 +101,16 @@ class Settings(BaseSettings):
                 "MODEL_NAME 使用 OpenAI 模型，但 .env 中没有有效的 OPENAI_API_KEY"
             )
         return value
+
+    def embedding_api_key(self) -> str:
+        """Return the OpenAI key used by the pgvector knowledge subsystem."""
+        value = self.openai_api_key.get_secret_value().strip() if self.openai_api_key else ""
+        if not value or value == "replace-me":
+            raise RuntimeError("知识库 RAG 需要有效的 OPENAI_API_KEY 来生成 Embedding")
+        return value
+
+    def knowledge_agent_enabled(self) -> bool:
+        return "knowledge-agent" in self.enabled_subagent_names()
 
     def checkpoint_encryption_key(self) -> bytes | None:
         """Return an optional 256-bit AES key used for persisted Agent checkpoints."""
@@ -115,6 +135,8 @@ class Settings(BaseSettings):
         return value
 
     def validate_subagent_runtime(self) -> None:
+        if self.knowledge_chunk_overlap >= self.knowledge_chunk_size:
+            raise ValueError("KNOWLEDGE_CHUNK_OVERLAP 必须小于 KNOWLEDGE_CHUNK_SIZE")
         if self.subagent_execution_mode() == "async" and not (
             self.subagent_server_url and self.subagent_server_url.strip()
         ):

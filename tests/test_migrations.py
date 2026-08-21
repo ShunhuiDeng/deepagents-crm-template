@@ -142,4 +142,7 @@ def test_applied_migration_checksums_remain_unchanged() -> None:
         "crm_app_003_lead_conversion_and_primary_contacts": (
             "0a2c8c0066d271e70e5321c5e6441e2c9eb5dc19a34fa79e0795531d07e54c33"
         ),
+        "crm_app_004_knowledge_rag": (
+            "e8a9abe487d62224229f7542c17cdf1200ec38eda86833cdaae01e6389b432c4"
+        ),
     }

@@ -33,6 +33,11 @@ from app.database import (
     InvalidActionError,
 )
 from app.dependencies import get_current_user, get_repo
+from app.knowledge import (
+    DuplicateKnowledgeDocumentError,
+    KnowledgeDocumentNotFoundError,
+    KnowledgeService,
+)
 from app.permissions import CurrentUser, Role
 from app.schemas import (
     AccountChainTransferOut,
@@ -63,6 +68,8 @@ from app.schemas import (
     LeadCreate,
     LeadOut,
     LeadUpdate,
+    KnowledgeDocumentCreate,
+    KnowledgeDocumentOut,
     LoginRequest,
     OpportunityCreate,
     OpportunityOut,
@@ -178,6 +185,13 @@ def get_agent_registry(request: Request) -> AgentRegistry:
     return request.app.state.agent_registry
 
 
+def get_knowledge_service(request: Request) -> KnowledgeService:
+    service = getattr(request.app.state, "knowledge_service", None)
+    if service is None:
+        raise HTTPException(status_code=503, detail="知识库 RAG 尚未启用")
+    return service
+
+
 def _client_metadata(request: Request) -> tuple[str | None, str | None]:
     user_agent = request.headers.get("user-agent")
     ip_address = request.client.host if request.client else None
@@ -249,9 +263,19 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             )
             checkpointer = AsyncPostgresSaver(checkpoint_pool, serde=serializer)
             await checkpointer.setup()
+            knowledge_service = None
+            if settings.knowledge_agent_enabled():
+                knowledge_service = KnowledgeService(
+                    pool,
+                    api_key=settings.embedding_api_key(),
+                    embedding_model=settings.knowledge_embedding_model,
+                    chunk_size=settings.knowledge_chunk_size,
+                    chunk_overlap=settings.knowledge_chunk_overlap,
+                )
             registry = build_agent_registry(
                 repository,
                 settings.enabled_subagent_names(),
+                knowledge_service=knowledge_service,
                 execution=settings.subagent_execution_mode(),
                 async_url=settings.subagent_server_url,
             )
@@ -267,6 +291,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             app.state.pool = pool
             app.state.checkpoint_pool = checkpoint_pool
             app.state.repository = repository
+            app.state.knowledge_service = knowledge_service
             app.state.agent_registry = registry
             app.state.checkpointer = checkpointer
             app.state.agent = agent
@@ -504,6 +529,40 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             answer=answer,
             pending_actions=pending_actions,
         )
+
+    @app.get("/api/knowledge/documents", response_model=list[KnowledgeDocumentOut])
+    async def list_knowledge_documents(
+        request: Request,
+        current_user: CurrentUser = Depends(get_current_user),
+    ) -> list[KnowledgeDocumentOut]:
+        return await get_knowledge_service(request).list_documents(current_user)
+
+    @app.post(
+        "/api/knowledge/documents",
+        response_model=KnowledgeDocumentOut,
+        status_code=status.HTTP_201_CREATED,
+    )
+    async def create_knowledge_document(
+        payload: KnowledgeDocumentCreate,
+        request: Request,
+        current_user: CurrentUser = Depends(get_current_user),
+    ) -> KnowledgeDocumentOut:
+        try:
+            return await get_knowledge_service(request).ingest_document(current_user, payload)
+        except DuplicateKnowledgeDocumentError as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+    @app.delete("/api/knowledge/documents/{document_id}", status_code=status.HTTP_204_NO_CONTENT)
+    async def delete_knowledge_document(
+        document_id: UUID,
+        request: Request,
+        current_user: CurrentUser = Depends(get_current_user),
+    ) -> Response:
+        try:
+            await get_knowledge_service(request).delete_document(current_user, document_id)
+        except KnowledgeDocumentNotFoundError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        return Response(status_code=status.HTTP_204_NO_CONTENT)
 
     @app.get("/api/conversations", response_model=list[ConversationOut])
     async def list_conversations(

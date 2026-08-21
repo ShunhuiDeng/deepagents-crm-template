@@ -40,6 +40,8 @@ REQUIRED_CLEAR_TABLES = (
 
 # These tables are owned by the optional knowledge-base subsystem.
 OPTIONAL_CLEAR_TABLES = (
+    "knowledge_chunks",
+    "knowledge_documents",
     "content_chunks",
     "structured_review_sessions",
     "document_units",

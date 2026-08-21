@@ -90,3 +90,14 @@ def test_database_pool_timeout_is_bounded() -> None:
 
     with pytest.raises(ValueError):
         Settings(_env_file=None, DB_POOL_TIMEOUT_SECONDS=0)
+
+
+def test_knowledge_chunk_overlap_must_be_smaller_than_chunk_size() -> None:
+    settings = Settings(
+        _env_file=None,
+        KNOWLEDGE_CHUNK_SIZE=1000,
+        KNOWLEDGE_CHUNK_OVERLAP=1000,
+    )
+
+    with pytest.raises(ValueError, match="CHUNK_OVERLAP"):
+        settings.validate_subagent_runtime()

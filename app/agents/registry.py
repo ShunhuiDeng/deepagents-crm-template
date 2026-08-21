@@ -3,8 +3,10 @@ from __future__ import annotations
 from typing import Any
 
 from app.agents.crud_agent.definition import build_crud_agent_definition
+from app.agents.knowledge_agent.definition import build_knowledge_agent_definition
 from app.agents.types import AgentDefinition, ExecutionMode
 from app.database import CRMRepository
+from app.knowledge import KnowledgeService
 
 
 class AgentRegistry:
@@ -47,22 +49,41 @@ def build_agent_registry(
     repository: CRMRepository,
     enabled_names: set[str] | None = None,
     *,
+    knowledge_service: KnowledgeService | None = None,
     execution: ExecutionMode = "sync",
     async_url: str | None = None,
 ) -> AgentRegistry:
-    """Compose the one CRM data subagent passed to Deep Agents."""
-    known_names = {"crud-agent"}
-    enabled_names = known_names if enabled_names is None else enabled_names
+    """Compose explicitly enabled specialist agents passed to Deep Agents."""
+    known_names = {"crud-agent", "knowledge-agent"}
+    enabled_names = (
+        {"crud-agent", "knowledge-agent"}
+        if enabled_names is None and knowledge_service is not None
+        else {"crud-agent"}
+        if enabled_names is None
+        else enabled_names
+    )
     unknown = enabled_names - known_names
     if unknown:
         raise ValueError(f"ENABLED_SUBAGENTS 包含未知名称: {sorted(unknown)}")
-    return AgentRegistry(
-        (
-            build_crud_agent_definition(
-                repository,
-                enabled="crud-agent" in enabled_names,
+    if "knowledge-agent" in enabled_names and knowledge_service is None:
+        raise ValueError("启用 knowledge-agent 时必须配置知识库 RAG 服务")
+    definitions: list[AgentDefinition] = [
+        build_crud_agent_definition(
+            repository,
+            enabled="crud-agent" in enabled_names,
+            execution=execution,
+            async_url=async_url,
+        )
+    ]
+    if knowledge_service is not None:
+        definitions.append(
+            build_knowledge_agent_definition(
+                knowledge_service,
+                enabled="knowledge-agent" in enabled_names,
                 execution=execution,
                 async_url=async_url,
-            ),
+            )
         )
+    return AgentRegistry(
+        tuple(definitions)
     )

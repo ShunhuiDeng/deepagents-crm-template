@@ -62,3 +62,22 @@ def test_subagent_permissions_deny_memory_and_other_paths() -> None:
 
     assert any(rule.mode == "deny" and "/memory/**" in rule.paths for rule in rules)
     assert any(rule.mode == "deny" and "/**" in rule.paths for rule in rules)
+
+
+def test_registry_builds_knowledge_agent_only_with_a_knowledge_service() -> None:
+    specs = build_agent_registry(
+        _repository(),
+        {"knowledge-agent"},
+        knowledge_service=cast(Any, object()),
+    ).build_specs()
+
+    assert [spec["name"] for spec in specs] == ["knowledge-agent"]
+    assert specs[0]["skills"] == ["/skills/knowledge-agent/"]
+    assert [agent_tool.name for agent_tool in specs[0]["tools"]] == [
+        "search_knowledge_base"
+    ]
+
+
+def test_registry_rejects_knowledge_agent_without_service() -> None:
+    with pytest.raises(ValueError, match="知识库 RAG 服务"):
+        build_agent_registry(_repository(), {"knowledge-agent"})

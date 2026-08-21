@@ -553,3 +553,43 @@ class ChatResponse(BaseModel):
     thread_id: UUID
     answer: str
     pending_actions: list[PendingActionOut] = Field(default_factory=list)
+
+
+KnowledgeVisibility = Literal["private", "shared"]
+
+
+class KnowledgeDocumentCreate(BaseModel):
+    """Trusted text supplied by a knowledge-base administrator."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    title: str = Field(min_length=1, max_length=300)
+    content: str = Field(min_length=1, max_length=500_000)
+    source: str | None = Field(default=None, max_length=2000)
+    visibility: KnowledgeVisibility = "shared"
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class KnowledgeDocumentOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    title: str
+    source: str | None
+    visibility: KnowledgeVisibility
+    chunk_count: int
+    metadata: dict[str, Any]
+    created_by_user_id: UUID
+    created_at: datetime
+    updated_at: datetime
+
+
+class KnowledgeSearchResult(BaseModel):
+    document_id: UUID
+    chunk_id: UUID
+    title: str
+    source: str | None
+    content: str
+    chunk_index: int
+    score: float
+    metadata: dict[str, Any]
