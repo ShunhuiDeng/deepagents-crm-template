@@ -1,123 +1,160 @@
-# 智能 CRM（Intelligent CRM）
+# CRM 与企业知识库检索系统
 
-智能 CRM 是一个基于 FastAPI、Deep Agents 和 PostgreSQL 的可复用 CRM 模板。它提供常规 CRM 页面、角色权限、线索转客户闭环，以及带多轮记忆和人工确认机制的 AI 助手。前端与 API 由同一个服务提供，适合本机开发、局域网试用和后续生产化改造。
+基于 FastAPI、PostgreSQL 和 Deep Agents 的 CRM 项目。系统提供基础客户管理、角色权限、Agent 对话和企业知识库检索能力。
 
-详细部署、使用、管理、备份和扩展说明见 [`docs/HANDOFF.md`](docs/HANDOFF.md)。
+## 功能
 
-## 核心能力
+- 线索、客户公司、联系人、商机和活动管理。
+- 登录、HttpOnly Cookie 会话和角色权限控制。
+- `admin / manager / sales / viewer` 四级角色。
+- Agent 查询 CRM 业务数据和企业知识库。
+- PostgreSQL + pgvector 文档检索，支持共享和私有文档。
+- 基于 PostgreSQL 的会话状态和多轮记忆。
+- CRM 新增、更新和线索转换须由用户确认后执行。
+- 写入前执行权限、外键和版本校验，并保留审计记录。
 
-- 登录、注册、注销和 HttpOnly Cookie 会话。
-- `admin / manager / sales / viewer` 四级 RBAC。
-- 线索、客户公司、联系人、商机和跟进活动五类业务实体。
-- 线索原子转换为客户公司、联系人和可选商机。
-- 客户公司 360° 视图与管理员整条客户链负责人转移。
-- 主 Agent 与一个 CRM 数据子 Agent。
-- 按账号和会话隔离的多轮记忆与 PostgreSQL checkpoint。
-- Agent 查询即时执行；新增、更新和线索转换需人工确认。
-- 可选 pgvector 知识库 RAG：管理员导入文档，知识库 Agent 只返回当前账号可访问的来源内容。
-- 写入前复检权限、负责人、外键和版本，并记录审计日志。
-
-## 权限矩阵
-
-| 角色 | 数据范围 | 新增 | 更新 | 删除 | 账号管理 | 整链转移 |
-|---|---|---:|---:|---:|---:|---:|
-| `admin` | 全部 | 是 | 是 | 是 | 是 | 是 |
-| `manager` | 全部 | 是 | 是 | 是 | 否 | 否 |
-| `sales` | 仅本人负责 | 是 | 是 | 否 | 否 | 否 |
-| `viewer` | 全部，只读 | 否 | 否 | 否 | 否 | 否 |
-
-权限由服务端认证上下文和数据库访问层执行，不依赖提示词。模型没有任意 SQL 工具，也不能自行指定业务负责人。
-
-## 业务闭环
+## 架构
 
 ```text
-线索
-  └── 原子转换
-      ├── 客户公司
-      ├── 联系人
-      ├── 可选商机
-      └── 永久来源映射
-
-客户公司 360°
-  ├── 联系人
-  ├── 商机
-  ├── 跟进活动
-  └── 来源线索
+浏览器
+  ↓
+FastAPI
+  ├── CRM REST API
+  ├── 登录、会话和权限检查
+  ├── Agent 对话接口
+  └── 知识库文档管理接口
+  ↓
+PostgreSQL
+  ├── CRM 业务表
+  ├── 会话、记忆、审计和待确认操作
+  ├── LangGraph checkpoint
+  └── pgvector 知识库向量
 ```
 
-页面、REST API 和 Agent 共用同一套 PostgreSQL 数据契约。联系人和商机可先作为未关联记录录入；一旦关联客户公司，负责人和关系必须保持一致，商机的主要联系人也必须属于同一公司。跟进活动填写多个关联时，后端同样校验整条关系链。
+Agent 分工：
 
-## 快速启动
+```text
+主 Agent
+├── crud-agent
+│   └── 查询线索、客户、联系人、商机和活动
+└── knowledge-agent
+    └── 检索产品资料、销售手册和制度文档
+```
 
-### 1. 准备环境
+`crud-agent` 只处理结构化 CRM 数据；`knowledge-agent` 只处理文档知识检索。两者均通过服务端注入的用户身份和权限运行。
 
-需要 Python 3.11+、PostgreSQL 兼容服务和 [uv](https://docs.astral.sh/uv/)。仓库预期托管在个人私有仓库 `ShunhuiDeng/deepagents-crm-template`。
+## 技术栈
 
-当前模板包含 `crm_app_000_core_schema`，可在空 PostgreSQL 中创建 `users`、`leads`、`accounts`、`contacts`、`opportunities` 和 `activities` 六张核心表；后续追加迁移会创建认证、会话、审计、待确认和转换结构，LangGraph 会初始化 checkpoint 表。当前应用每次启动都会调用迁移检查，因此运行账号仍需建表、建索引和修改表权限。若要分离迁移角色与最小权限运行角色，需要先实现独立迁移入口和跳过启动迁移的开关。对已有数据库，`IF NOT EXISTS` 不会验证同名表是否发生契约漂移，接入前仍需核对 schema 并备份。
+- Python 3.11+
+- FastAPI
+- PostgreSQL、psycopg、pgvector
+- Deep Agents、LangChain、LangGraph
+- OpenAI Embedding
+- Pydantic
+- 原生 JavaScript
+
+## 目录
+
+```text
+app/
+├── main.py                 # FastAPI 应用、路由和生命周期
+├── database.py             # CRM 数据访问与权限校验
+├── migrations.py           # PostgreSQL 迁移
+├── knowledge.py            # 文档分块、向量生成和检索
+├── permissions.py          # RBAC
+├── schemas.py              # API 请求/响应模型
+└── agents/
+    ├── main_agent/         # 主 Agent
+    ├── crud_agent/         # CRM 数据 Agent
+    └── knowledge_agent/    # 知识库检索 Agent
+
+scripts/
+├── start-local.sh
+├── ingest-knowledge.py     # 导入 Markdown/TXT 文档
+└── clear-crm-data.py
+```
+
+## 环境要求
+
+- Python 3.11+
+- PostgreSQL
+- uv
+- 启用知识库功能时，PostgreSQL 需要安装 pgvector 扩展
+- OpenAI API Key
+
+## 配置与启动
+
+复制配置文件：
 
 ```bash
-git clone git@github.com:ShunhuiDeng/deepagents-crm-template.git
-cd deepagents-crm-template
 cp .env.example .env.local
-chmod 600 .env.local
 ```
 
-### 2. 配置
-
-编辑 `.env.local`。下面全部是占位值，不能原样用于部署：
+至少配置以下变量：
 
 ```dotenv
-DATABASE_URL=postgresql://<db-user>:<db-password>@<db-host>:<db-port>/<db-name>?sslmode=<ssl-mode>
-MODEL_NAME=<provider:model-name>
-OPENAI_API_KEY=<model-api-key>
+DATABASE_URL=postgresql://<user>:<password>@<host>:5432/<database>
+MODEL_NAME=openai:gpt-5.4-mini
+OPENAI_API_KEY=<your-api-key>
 LANGGRAPH_AES_KEY=<64-hex-characters>
-APP_HOST=<listen-address>
-APP_PORT=<listen-port>
-COOKIE_SECURE=<true-or-false>
-REGISTRATION_ENABLED=<true-or-false>
-FIRST_USER_IS_ADMIN=<true-or-false>
-FIRST_ADMIN_LOCAL_ONLY=<true-or-false>
-ENABLED_SUBAGENTS=<comma-separated-subagent-names>
-SUBAGENT_EXECUTION=<sync-or-async>
+
+ENABLED_SUBAGENTS=crud-agent,knowledge-agent
+KNOWLEDGE_EMBEDDING_MODEL=text-embedding-3-small
+KNOWLEDGE_CHUNK_SIZE=1800
+KNOWLEDGE_CHUNK_OVERLAP=240
 ```
 
-真实数据库密码、模型密钥和 AES 密钥只应保存在部署环境的机密管理系统或权限为 `0600` 的 `.env.local` 中，不得写入 Git、文档、日志或聊天记录。
-
-### 3. 安装并启动
+启动服务：
 
 ```bash
 uv sync --frozen
 ./scripts/start-local.sh
 ```
 
-服务电脑访问 `http://127.0.0.1:<listen-port>`。局域网设备访问 `http://<server-lan-ip>:<listen-port>`；要允许其他设备连接，监听地址应配置为所有接口，并在防火墙中仅放行可信网段。
+默认访问地址为 `http://127.0.0.1:8000`。
 
-## 首个管理员与账号开通
+## 知识库 RAG
 
-空账号库首次启动时，可配置为只允许从服务电脑本机注册首个管理员。后续注册账号默认是 `sales`，管理员在“账号管理”中调整角色。创建完所需账号后，应关闭公开注册并重启服务。
+知识库使用两张表：
 
-管理员密码不应出现在仓库。建议通过团队密码管理器交接，并在首次登录后按组织策略轮换。
-
-维护模式下替换全部登录账号：
-
-```bash
-.venv/bin/python scripts/reset-admin.py \
-  --username <new-admin-username> \
-  --email <new-admin-email> \
-  --display-name <new-admin-display-name> \
-  --confirm RESET-DEEPAGENTS-CRM-ADMIN
+```text
+knowledge_documents  # 文档标题、来源、可见范围和元数据
+knowledge_chunks     # 文本分块、Embedding 和向量索引
 ```
 
-脚本通过终端隐藏输入新密码。它不是日常开户工具；执行前必须停写、备份，并确认旧账号不再负责业务数据。
+处理流程：
 
-## AI 助手写入规则
+```text
+Markdown / TXT
+  ↓
+文本清洗和分块
+  ↓
+OpenAI Embedding
+  ↓
+写入 pgvector
+  ↓
+HNSW 余弦相似度检索
+```
 
-- 查询当前账号有权查看的数据时立即执行。
-- 新增、更新和线索转换只生成待确认动作。
-- 发起人必须在前端检查字段并点击“确认执行”。
-- 批准时服务端再次检查账号、角色、数据范围、外键和版本。
-- 过期或冲突的动作不会写入，需重新查询后发起。
-- AI 不提供业务删除工具；删除由常规 CRM 页面按角色执行。
+管理员可通过 API 写入文本，也可用脚本导入 Markdown/TXT：
+
+```bash
+uv run python scripts/ingest-knowledge.py ./docs/product.md \
+  --owner-username <admin-username>
+```
+
+默认导入为共享文档；使用 `--private` 时，文档仅对导入账号可见。
+
+## 权限与写入规则
+
+| 角色 | 数据范围 | 写入 | 账号与知识库管理 |
+|---|---|---|---|
+| `admin` | 全部 | 是 | 是 |
+| `manager` | 全部 | 是 | 否 |
+| `sales` | 仅本人负责 | 是 | 否 |
+| `viewer` | 全部，只读 | 否 | 否 |
+
+Agent 不具备任意 SQL、宿主文件系统或环境变量访问能力。CRM 写入不会直接执行：Agent 只生成待确认操作，用户确认后由后端事务完成权限复检、关系校验、乐观锁校验和审计记录。
 
 ## 测试
 
@@ -129,70 +166,12 @@ node --check app/static/app.js
 bash -n scripts/start-local.sh
 ```
 
-## 破坏性维护
+## 说明
 
-以下命令保留登录账号和迁移元数据，但会清空 CRM 业务数据、会话、待确认项、审计、checkpoint，以及当前数据库中实际存在的共享知识库内容表；不存在的可选表会安全跳过。它不是备份命令。
-
-```bash
-.venv/bin/python scripts/clear-crm-data.py \
-  --confirm CLEAR-DEEPAGENTS-CRM-DATA
-```
-
-执行前必须停止写入并完成可恢复备份。备份文件建议使用 `deepagents-crm-template-<timestamp>.dump` 命名并存放在仓库之外。
-
-## Agent 扩展
-
-```text
-app/agents/
-├── main_agent/       # 主 Agent、调度和会话记忆工具
-├── crud_agent/       # CRM 子 Agent 与窄权限工具
-├── registry.py       # 显式注册表
-├── context.py        # 服务端认证后的运行上下文
-└── service.py        # 会话串行和调用超时
-
-agent_assets/skills/
-├── supervisor/
-└── crud-agent/
-```
-
-新增工具或 Skill 时，应使用强类型窄工具，从服务端运行上下文取得身份，在 Repository 层重复执行 RBAC，并让所有业务写入经过 pending、确认、事务和审计流程。
-
-详见 [`docs/agent-architecture.md`](docs/agent-architecture.md) 和 [`docs/memory-architecture.md`](docs/memory-architecture.md)。
-
-## 知识库 RAG
-
-知识库与 CRM 业务表分离：`crud-agent` 查询结构化客户事实，`knowledge-agent` 查询产品资料、制度和销售文档。二者由主 Agent 调度，知识库结果必须包含来源，不能被当作可执行指令。
-
-首次启用前，请在 PostgreSQL 服务器安装 `pgvector` 扩展；应用启动时会通过迁移执行 `CREATE EXTENSION vector` 并创建 `knowledge_documents`、`knowledge_chunks`。执行该迁移的数据库角色必须拥有创建扩展和表/索引的权限。
-
-设置 `.env.local`：
-
-```dotenv
-ENABLED_SUBAGENTS=crud-agent,knowledge-agent
-KNOWLEDGE_EMBEDDING_MODEL=text-embedding-3-small
-KNOWLEDGE_CHUNK_SIZE=1800
-KNOWLEDGE_CHUNK_OVERLAP=240
-```
-
-管理员可以使用受认证保护的 `POST /api/knowledge/documents` 写入文本知识，也可以导入文件：
-
-```bash
-uv run python scripts/ingest-knowledge.py ./docs/product.md \
-  --owner-username <admin-username>
-```
-
-首期脚本支持 UTF-8 编码的 `.txt` 和 `.md`。`--private` 只允许导入账号检索；默认 `shared` 文档可被所有已登录账号检索。知识库管理 API 仅允许管理员使用。
-
-## 生产化要求
-
-- 使用 HTTPS 反向代理并启用安全 Cookie。
-- 为应用建立专用、最小权限的数据库角色。
-- 限制数据库来源网络并验证 TLS 证书。
-- 将机密放入机密管理系统，制定轮换和恢复流程。
-- 建立 PostgreSQL 备份、恢复演练、日志和告警。
-- 保持单 worker，直到实现同一会话的分布式锁或固定路由。
-- 上线前完成真实数据库、浏览器、模型、并发和权限隔离验收。
+- 迁移在应用启动时执行；数据库账号需要具备建表、建索引权限。启用 RAG 时还需要创建 `vector` 扩展的权限。
+- 当前会话串行执行。增加多个 Uvicorn worker 前，需要补充分布式锁或固定会话路由。
+- 生产环境应通过 HTTPS 反向代理运行，并妥善管理数据库、模型和 LangGraph 加密密钥。
 
 ## 许可
 
-本仓库基于 MIT License 开源。您可以自由地使用、复制、修改、合并、发布、分发、再许可和销售本软件，但须遵守 MIT License 中规定的相关条件。详见 [`LICENSE`](LICENSE)。
+本项目使用 [MIT License](LICENSE)。
